@@ -1,0 +1,654 @@
+// # NRQL Grammar for Lark Parser
+// This file defines the grammar for NRQL (New Relic Query Language) using Lark parser syntax.
+// It includes rules for parsing NRQL queries, clauses, and expressions.
+
+// ## Parser Rules
+// The following rules define the structure of NRQL queries.
+
+// ### Start rule
+// The start rule defines the entry point for parsing NRQL queries.
+?start: nrql_query?
+
+// ### General NRQL query rule
+// The nrql_query rule matches a complete NRQL query.
+?nrql_query: show_event_types_query
+    | delete_query
+
+// ### NRQL queries variants
+// NRQL queries can have NOT_EQUAL structures and clauses.
+// The following rules define the NOT_EQUAL types of NRQL queries.
+
+// ##### Show event types query
+// This rule matches the syntax for showing event types in NRQL.
+// It follows the structure:
+// SHOW EVENT TYPES
+// [SINCE ...]
+// [UNTIL ...]
+show_event_types_query: SHOW EVENT TYPES since_clause? until_clause?
+
+// ##### Delete query
+// This rule matches the syntax to remove specific data and attributes within
+// Pipeline Control.
+// It follows the structure:
+// DELETE [attribute [, attribute]] FROM event_type [WHERE ...]
+delete_query: delete_event_type_query | delete_attributes_query
+
+?delete_event_type_query: DELETE FROM event_type where_clause?
+
+?delete_attributes_query: DELETE attribute_list FROM event_type where_clause?
+
+// ### NRQL clauses
+// NRQL clauses are used to filter and specify conditions for the data being
+// queried.
+
+// #### With clause
+// WITH ... AS ...
+with_clause: WITH variable_definition_list
+
+variable_definition_list: variable_definition (COMMA variable_definition)*
+
+variable_definition: variable_value AS variable_name
+
+variable_value: function_call_expression
+    | literal
+
+?variable_name: attribute
+    | OPEN_PAREN attribute_list CLOSE_PAREN
+
+// #### Where clause
+// WHERE condition_expression
+where_clause: WHERE condition_expression
+
+// #### Facet clause
+// FACET facet_expression [ORDER BY ...]
+facet_clause: FACET facet_expression order_by_clause?
+
+// #### Order-by clause
+// ORDER BY order_expression [ASC | DESC]
+order_by_clause: ORDER BY order_expression (ASC | DESC)?
+
+// #### Since clause
+// SINCE time_expression
+since_clause: SINCE time_expression
+
+// #### Until clause
+// UNTIL time_expression
+until_clause: UNTIL [time_expression | NOW]
+
+// #### timezone clause
+// WITH TIMEZONE timezone_expression
+timezone_clause: WITH TIMEZONE timezone_expression
+
+// Compare-with clause
+// COMPARE WITH [time_measure AGO]
+compare_with_clause: COMPARE WITH time_measure AGO
+
+// #### Timeseries clause
+// TIMESERIES [time_measure | MAX | AUTO] [SLIDE BY ...] [EXTRAPOLATE] [PREDICT ...]
+timeseries_clause: TIMESERIES [time_measure | MAX | AUTO] slide_by_clause? EXTRAPOLATE? predict_clause?
+
+// #### Slide-by clause
+// SLIDE BY time_expression
+slide_by_clause: SLIDE BY time_measure
+
+// #### Predict clause
+// PREDICT [holtwinters] [BY ...] [USING ...]
+predict_clause: PREDICT (function_call_holtwinters)? (BY time_measure)? (USING time_measure)?
+
+// ### NRQL expressions
+// NRQL expressions are used to define conditions and operations on the data
+// being queried.
+
+// #### Time expressions
+// Time expressions can include relative time measures, day references, and
+// specific datetime references.
+time_expression : (time_measure AGO)
+    | day_reference at_time_reference?
+    | this_period_reference
+    | last_period_reference
+    | datetime_reference
+
+time_measure: INT time_unit
+
+time_unit: MILLISECOND
+    | MILLISECONDS
+    | SECOND
+    | SECONDS
+    | MINUTE
+    | MINUTES
+    | HOUR
+    | HOURS
+    | DAY
+    | DAYS
+    | WEEK
+    | WEEKS
+    | MONTH
+    | MONTHS
+    | QUARTER
+    | QUARTERS
+    | YEAR
+    | YEARS
+
+day_reference: TODAY
+    | YESTERDAY
+    | MONDAY
+    | TUESDAY
+    | WEDNESDAY
+    | THURSDAY
+    | FRIDAY
+    | SATURDAY
+    | SUNDAY
+
+at_time_reference: AT short_time_reference
+
+short_time_reference: SINGLE_QUOTED_STRING
+
+this_period_reference: THIS period_unit_reference
+
+last_period_reference: LAST period_unit_reference
+
+period_unit_reference: HOUR
+    | WEEK
+    | MONTH
+    | QUARTER
+    | YEAR
+
+time_reference: SINGLE_QUOTED_STRING
+
+date_reference: SINGLE_QUOTED_STRING
+
+datetime_reference: SINGLE_QUOTED_STRING
+
+timezone_expression: SINGLE_QUOTED_STRING
+
+// #### Facet expressions
+// Facet expressions are used to group data in NRQL queries.
+facet_expression: attribute_list
+    | function_call_expression
+
+// #### Order expressions
+// Order expressions are used to specify the order of results in NRQL queries.
+order_expression: attribute_list
+    | function_call_expression
+
+// #### Filter expressions
+// Filter expressions are used to specify conditions for filtering data in NRQL queries.
+?condition_expression: or_expression+
+
+?or_expression: and_expression (OR and_expression)*
+
+?and_expression: comparison_expression (AND comparison_expression)*
+
+?comparison_expression: arithmetic_expression (comparison_operator arithmetic_expression)*
+
+?arithmetic_expression: term (arithmetic_operator term)*
+
+?term: factor (STAR factor | SLASH factor)*
+
+?factor: base (PLUS base | MINUS base)*
+
+?base: literal_list
+    | attribute
+    | function_call_expression
+    | OPEN_PAREN condition_expression CLOSE_PAREN
+
+function_call_expression: function_name OPEN_PAREN (attribute_list | literal_list)? CLOSE_PAREN
+    | function_name OPEN_PAREN CLOSE_PAREN
+
+function_call_holtwinters: HOLTWINTERS OPEN_PAREN parameter_list_holtwinters CLOSE_PAREN
+
+parameter_list_holtwinters: parameter_holtwinters (COMMA parameter_holtwinters)
+
+parameter_holtwinters: /seasonality/i COLON (time_measure | AUTO | NONE)
+    | /alpha/i COLON number
+    | /beta/i COLON number
+    | /gamma/i COLON number
+    | /phi/i COLON number
+
+function_name: aggregating_function_name
+    | non_aggregating_function_name
+    | time_manipulation_function_name
+    | mathematical_function_name
+    | casting_function_name
+
+
+aggregating_function_name: AGGREGATIONENDTIME
+    | APDEX
+    | AVERAGE
+    | BUCKETPERCENTILE
+    | CARDINALITY
+    | CDFPERCENTAGE
+    | COUNT
+    | DERIVATIVE
+    | EARLIEST
+    | FILTER
+    | FUNNEL
+    | HISTOGRAM
+    | KEYSET
+    | LATEST
+    | LATESTRATE
+    | MAX
+    | MEDIAN
+    | MIN
+    | PERCENTAGE
+    | PERCENTILE
+    | PREDICTLINEAR
+    | RATE
+    | STDVAR
+    | SUM
+    | UNIQUECOUNT
+    | UNIQUES
+
+non_aggregating_function_name: ACCOUNTID
+    | APARSE
+    | BLOB
+    | BUCKETS
+    | CAPTURE
+    | CIDRADDRESS
+    | CONCAT
+    | CONTAINS
+    | CONVERT
+    | DECODE
+    | DIMENSIONS
+    | ENCODE
+    | EVENTTYPE
+    | GETCDFCOUNT
+    | GETFIELD
+    | IF
+    | JPARSE
+    | LENGTH
+    | LOOKUP
+    | LOWER
+    | MAPKEYS
+    | MAPVALUES
+    | MOD
+    | POSITION
+    | ROUND
+    | STDDEV
+    | SUBSTRING
+    | TODATETIME
+    | TOTIMESTAMP
+    | UPPER
+
+time_manipulation_function_name: DATEOF
+    | DAYOFMONTHOF
+    | DAYSINMONTHOF
+    | HOUROF
+    | MINUTEOF
+    | MONTHOF
+    | QUARTEROF
+    | WEEKDAYOF
+    | WEEKOF
+    | YEAROF
+
+mathematical_function_name: ABS
+    | CEIL
+    | CLAMP_MAX
+    | CLAMP_MIN
+    | EXP
+    | FLOOR
+    | LN
+    | LOG
+    | LOG10
+    | LOG2
+    | POW
+    | SQRT
+
+casting_function_name: BOOLEAN
+    | NUMERIC
+    | STRING
+    | TUPLE
+
+arithmetic_operator: PLUS
+    | MINUS
+    | STAR
+    | SLASH
+
+comparison_operator: EQUAL
+    | NOT_EQUAL
+    | GREATER
+    | GREATER_EQUAL
+    | LESS
+    | LESS_EQUAL
+    | NOT? IN
+    | NOT? LIKE
+    | NOT? RLIKE
+    | IS NOT?
+
+// #### Identifier expressions
+// Identifier expressions are used to refer to attributes, event types, and
+// other elements in NRQL queries.
+event_type_list: event_type (COMMA event_type)*
+event_type     : EVENT_TYPE
+
+attribute_list: attribute (COMMA attribute)*
+attribute     : ATTRIBUTE
+
+literal_list: literal (COMMA literal)*
+?literal    : number
+    | string
+    | boolean
+    | NULL
+
+?number : SIGNED_NUMBER
+?string : SINGLE_QUOTED_STRING
+?boolean: TRUE | FALSE
+
+// ## Lexer Rules
+// The following rules define the tokens used in NRQL queries.
+
+// ### Token Definitions
+// The tokens are defined using regular expressions and keywords.
+
+// #### Grouping tokens
+// Grouping tokens are used to define the structure of expressions and queries.
+OPEN_PAREN    : "("
+CLOSE_PAREN   : ")"
+OPEN_BRACKET  : "["
+CLOSE_BRACKET : "]"
+
+// #### Punctuation tokens
+// Punctuation tokens are used to separate elements in queries and expressions.
+DOT      : "."
+COMMA    : ","
+COLON    : ":"
+BACKTICK : "`"
+QUOTE    : "'"
+
+// #### Operator tokens
+// Operator tokens are used to perform various operations in NRQL queries.
+// These include arithmetic operations, comparison operations, and logical operations.
+// The operators are defined as keywords or symbols that can be used in expressions.
+
+// ##### Arithmetic operators
+// Arithmetic operators are used for mathematical operations in expressions.
+// These include addition, subtraction, multiplication, and division.
+STAR  : "*"
+PLUS  : "+"
+MINUS : "-"
+SLASH : "/"
+
+// ##### Comparison operators
+// Comparison operators are used to compare values in expressions.
+// These include equality, inequality, greater than, less than, and their
+// respective equals variants.
+NOT_EQUAL     : "!="
+EQUAL         : "="
+GREATER_EQUAL : ">="
+GREATER       : ">"
+LESS_EQUAL    : "<="
+LESS          : "<"
+
+// ##### Word operators
+// Word operators are used to perform logical operations and string matching.
+// These include logical AND, OR, NOT, and string matching LIKE and RLIKE.
+// They also include the IN operator for checking membership in a set, the AT
+// operator for specifying a time reference, the IS operator for checking
+// nullability or constant identity and the AS operator for aliasing.
+AND   : "AND"i
+AS    : "AS"i
+AT    : "AT"i
+IN    : "IN"i
+IS    : "IS"i
+LIKE  : "LIKE"i
+NOT   : "NOT"i
+ON    : "ON"i
+OR    : "OR"i
+RLIKE : "RLIKE"i
+
+
+// #### Constants tokens
+// Constants tokens are used to represent boolean values and null.
+TRUE  : "TRUE"i
+FALSE : "FALSE"i
+NULL  : "NULL"i
+NONE  : "NONE"i
+
+// #### Keywords tokens
+// Keywords tokens are reserved words in NRQL that have special meaning.
+// These include keywords for clauses, functions, and other constructs in NRQL.
+
+// ##### Clause keywords
+// Clause keywords are used to define specific parts of NRQL queries.
+SHOW          : "SHOW"i
+EVENT         : "EVENT"i
+TYPES         : "TYPES"i
+DELETE        : "DELETE"i
+FROM          : "FROM"i
+WITH          : "WITH"i
+INNER         : "INNER"i
+LEFT          : "LEFT"i
+JOIN          : "JOIN"i
+SELECT        : "SELECT"i
+WHERE         : "WHERE"i
+FACET         : "FACET"i
+CASES         : "CASES"i
+COMPARE       : "COMPARE"i
+EXTRAPOLATE   : "EXTRAPOLATE"i
+LIMIT         : "LIMIT"i
+OFFSET        : "OFFSET"i
+ORDER         : "ORDER"i
+BY            : "BY"i
+ASC           : "ASC"i
+DESC          : "DESC"i
+SINCE         : "SINCE"i
+UNTIL         : "UNTIL"i
+AUTO          : "AUTO"i
+PREDICT       : "PREDICT"i
+TIMEZONE      : "TIMEZONE"i
+SLIDE         : "SLIDE"i
+TIMESERIES    : "TIMESERIES"i
+METRIC_FORMAT : "METRIC_FORMAT"i
+RAW           : "RAW"i
+USING         : "USING"i
+
+// ##### Function keywords
+// Function keywords are used to define built-in functions in NRQL queries.
+// These include functions for aggregating, filtering, and transforming data.
+
+// ###### Aggregation functions
+// Aggregation functions are used to perform calculations on sets of data.
+AGGREGATIONENDTIME : "aggregationEndTime"i
+APDEX              : "apdex"i
+AVERAGE            : "average"i
+BUCKETPERCENTILE   : "bucketPercentile"i
+CARDINALITY        : "cardinality"i
+CDFPERCENTAGE      : "cdfPercentage"i
+COUNT              : "count"i
+DERIVATIVE         : "derivative"i
+EARLIEST           : "earliest"i
+FILTER             : "filter"i
+FUNNEL             : "funnel"i
+HISTOGRAM          : "histogram"i
+KEYSET             : "keyset"i
+LATEST             : "latest"i
+LATESTRATE         : "latestrate"i
+MAX                : "max"i
+MEDIAN             : "median"i
+MIN                : "min"i
+PERCENTAGE         : "percentage"i
+PERCENTILE         : "percentile"i
+PREDICTLINEAR      : "predictLinear"i
+RATE               : "rate"i
+STDVAR             : "stdvar"i
+SUM                : "sum"i
+UNIQUECOUNT        : "uniqueCount"i
+UNIQUES            : "uniques"i
+
+// ###### Non-aggregation functions
+// Non-aggregation functions are used to perform operations that do not
+// aggregate data, such as string manipulation or mathematical operations.
+ACCOUNTID   : "accountId"i
+APARSE      : "aparse"i
+BLOB        : "blob"i
+BUCKETS     : "buckets"i
+CAPTURE     : "capture"i
+CIDRADDRESS : "cidrAddress"i
+CONCAT      : "concat"i
+CONTAINS    : "contains"i
+CONVERT     : "convert"i
+DECODE      : "decode"i
+DIMENSIONS  : "dimensions"i
+ENCODE      : "encode"i
+EVENTTYPE   : "eventType"i
+GETCDFCOUNT : "getCdfCount"i
+GETFIELD    : "getField"i
+HOLTWINTERS : "holtWinters"i
+IF          : "if"i
+JPARSE      : "jparse"i
+LENGTH      : "length"i
+LOOKUP      : "lookup"i
+LOWER       : "lower"i
+MAPKEYS     : "mapKeys"i
+MAPVALUES   : "mapValues"i
+MOD         : "mod"i
+POSITION    : "position"i
+ROUND       : "round"i
+STDDEV      : "stddev"i
+SUBSTRING   : "substring"i
+TODATETIME  : "toDatetime"i
+TOTIMESTAMP : "toTimestamp"i
+UPPER       : "upper"i
+
+// ###### Time manipulation functions
+// Time manipulation functions are used to perform operations on time values
+// in NRQL queries. They include functions for converting between time formats
+// and extracting components of time values.
+DATEOF        : "dateOf"i
+DAYOFMONTHOF  : "dayOfMonthOf"i
+DAYSINMONTHOF : "daysInMonthOf"i
+HOUROF        : "hourOf"i
+MINUTEOF      : "minuteOf"i
+MONTHOF       : "monthOf"i
+QUARTEROF     : "quarterOf"i
+WEEKDAYOF     : "weekdayOf"i
+WEEKOF        : "weekOf"i
+YEAROF        : "yearOf"i
+
+// ###### Mathematical functions
+// Mathematical functions are used to perform mathematical operations on
+// numeric values in NRQL queries. They include functions for calculating
+// absolute values, logarithms, and trigonometric functions.
+ABS       : "abs"i
+CEIL      : "ceil"i
+CLAMP_MAX : "clamp_max"i
+CLAMP_MIN : "clamp_min"i
+EXP       : "exp"i
+FLOOR     : "floor"i
+LN        : "ln"i
+LOG       : "log"i
+LOG10     : "log10"i
+LOG2      : "log2"i
+POW       : "pow"i
+SQRT      : "sqrt"i
+
+// ###### Casting functions
+// Casting functions are used to convert values between NOT_EQUAL types in
+// NRQL queries. They include functions for converting strings to numbers,
+// numbers to strings, and other type conversions.
+BOOLEAN : "boolean"i
+NUMERIC : "numeric"i
+STRING  : "string"i
+TUPLE   : "tuple"i
+
+// ##### Time keywords
+// Time keywords are used to specify time-related conditions in NRQL queries.
+// They include keywords for specifying time periods, relative time measures,
+// and specific time references.
+
+// ###### Relative time references
+// Relative time references are used to specify time periods relative to the
+// current time. They include keywords for specifying periods in the past or
+// relative to the current time.
+AGO       : "AGO"i
+LAST      : "LAST"i
+NOW       : "NOW"i
+THIS      : "THIS"i
+TODAY     : "TODAY"i
+YESTERDAY : "YESTERDAY"i
+
+// ###### Day references
+// Day references are used to specify specific days of the week in NRQL queries.
+MONDAY    : "MONDAY"i
+TUESDAY   : "TUESDAY"i
+WEDNESDAY : "WEDNESDAY"i
+THURSDAY  : "THURSDAY"i
+FRIDAY    : "FRIDAY"i
+SATURDAY  : "SATURDAY"i
+SUNDAY    : "SUNDAY"i
+
+// ###### Time unit keywords
+// Time unit keywords are used to specify units of time in NRQL queries.
+MILLISECOND  : "MILLISECOND"i
+MILLISECONDS : "MILLISECONDS"i
+SECOND       : "SECOND"i
+SECONDS      : "SECONDS"i
+MINUTE       : "MINUTE"i
+MINUTES      : "MINUTES"i
+HOUR         : "HOUR"i
+HOURS        : "HOURS"i
+DAY          : "DAY"i
+DAYS         : "DAYS"i
+WEEK         : "WEEK"i
+WEEKS        : "WEEKS"i
+MONTH        : "MONTH"i
+MONTHS       : "MONTHS"i
+QUARTER      : "QUARTER"i
+QUARTERS     : "QUARTERS"i
+YEAR         : "YEAR"i
+YEARS        : "YEARS"i
+
+// ###### Generic tokens
+// Generic tokens are used to represent various types of values in NRQL queries.
+// These include numeric values, strings, and identifiers.
+// They are defined using regular expressions and keywords.
+
+// #### Identifiers tokens
+// Identifiers tokens are used to represent names of attributes, event types,
+// and other elements in NRQL queries.
+_SAFE_EVENT_TYPE  : /[a-zA-Z][a-zA-Z0-9_]*/
+_UNSAFE_EVENT_TYPE: /[0-9_:]?[a-zA-Z0-9_:]+/
+EVENT_TYPE        : _SAFE_EVENT_TYPE | BACKTICK _UNSAFE_EVENT_TYPE BACKTICK
+
+_SAFE_ATTRIBUTE  : /[a-zA-Z][a-zA-Z0-9_]*/
+_UNSAFE_ATTRIBUTE: /.*/
+ATTRIBUTE        : _SAFE_ATTRIBUTE (DOT _SAFE_ATTRIBUTE)? | BACKTICK _UNSAFE_ATTRIBUTE BACKTICK
+
+// #### Numeric tokens
+// Numeric tokens are used to represent numeric values in NRQL queries.
+DIGIT: "0".."9"
+
+INT: "0" | ("1" .. "9") DIGIT*
+SIGNED_INT: ["+"|"-"] INT
+
+DECIMAL: INT "." INT? | "." INT
+SIGNED_DECIMAL: ["+"|"-"] DECIMAL
+
+_EXP: ("e"|"E") SIGNED_INT
+FLOAT: INT _EXP | DECIMAL _EXP?
+SIGNED_FLOAT: ["+"|"-"] FLOAT
+
+NUMBER: FLOAT | INT
+SIGNED_NUMBER: ["+"|"-"] NUMBER
+
+// #### String tokens
+// String tokens are used to represent string values in NRQL queries.
+_STRING_INNER: /.*?/
+_STRING_ESC_INNER: _STRING_INNER /(?<!\\)(\\\\)*?/
+SINGLE_QUOTED_STRING: "'" _STRING_ESC_INNER "'"
+
+// #### Other tokens
+// Other tokens are used to represent whitespace, comments, and other
+// miscellaneous elements in NRQL queries.
+
+// ##### Whitespace tokens
+WS: /[ \t\f\r\n]/+
+
+%ignore WS
+
+// ##### Comments tokens
+SINGLE_LINE_COMMENT: /(--|\/\/)[^\n]*/
+MULTI_LINE_COMMENT: "/*" /(.|\n)*?/ "*/"
+
+%ignore SINGLE_LINE_COMMENT
+%ignore MULTI_LINE_COMMENT
