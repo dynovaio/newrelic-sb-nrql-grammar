@@ -2,9 +2,9 @@
 
 # New Relic NRQL Grammar
 
-This repository contains the grammar for New Relic Query Language (NRQL). This
-grammar is used as reference to implement syntax highlighting and other tools
-for NRQL built by [Dynova][href:dynova].
+This repository contains the Lark grammar for New Relic Query Language (NRQL).
+NRQL Grammar is used as reference to implement syntax highlighting and other
+tools for NRQL built by [Dynova][href:dynova].
 
 ## Features
 
@@ -13,7 +13,7 @@ for NRQL built by [Dynova][href:dynova].
 
 Try it out in the [Lark parser IDE ↗][href:lark-parser-ide]
 
-[Screenshot of the IDE][href:lark-parser-ide-sample]
+![Screenshot of the IDE][href:lark-parser-ide-sample]
 
 ## Release Notes
 
